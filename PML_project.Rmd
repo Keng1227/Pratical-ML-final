@@ -1,0 +1,63 @@
+---
+title: "Classe_prediction_model"
+author: "HTKeng"
+date: "4/14/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE, cache=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Analysis  
+## Summary  
+1. Load the data set and briefly learn the characteristics of the data  
+2. Split the data with a 75-25 split  
+3. Since the number of variables in the training data is too large, clean the data by 1) excluding variables which apparently cannot be explanatory variables, and 2) reducing variables with little information.  
+4. Train the model with rf and preprocess with pca, cv 3 times 5-fold cv  
+6. Check the model with the testing data set  
+7. Apply the model to estimate classes of 20 observations  
+  
+## Loading data  
+```{r, cache=TRUE}
+library(caret)
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", "training.csv")
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", "testing.csv")
+training <- read.csv("training.csv")
+testing <- read.csv("testing.csv")
+```
+
+## Clean the dataset  
+```{r, cache=TRUE}
+set.seed(123)
+inTrain <- createDataPartition(training$classe, p = .75, list = FALSE)
+mytraining <- training[inTrain, ]
+mytesting <- training[-inTrain,]
+## exclude vars without prediction values
+exclude <- grep("name|timestamp|window|X", colnames(mytraining), value = F)
+mytrainingex <- mytraining[, -exclude]
+mytestingex <- mytesting[,-exclude]
+
+## exclude NA rate > .9
+mytrainingex[mytrainingex == ""] <- NA
+NArate <- apply(mytrainingex,2,function(x)sum(is.na(x))/nrow(mytrainingex))
+myTraining <- mytrainingex[!(NArate>.9)]
+mytestingex[mytestingex == ""]<- NA
+NArate <- apply(mytestingex,2,function(x)sum(is.na(x))/nrow(mytestingex))
+myTesting <- mytestingex[!(NArate>.9)]
+```
+
+## Apply rf to select top 20 features  
+```{r, cache=TRUE}
+fitControl <- trainControl(method = "repeatedcv", number = 3, repeats = 5, classProbs = TRUE, search = "random")
+modelfit <- train(classe~., data = myTraining, method = "rf", trControl = fitControl, preProcess = "pca")
+```
+## Testing accuracy  
+```{r}
+confusionMatrix(myTesting$classe, predict(modelfit, myTesting))
+```
+## Predict 20 cases  
+```{r}
+predict(modelfit, testing)
+```
+
+
